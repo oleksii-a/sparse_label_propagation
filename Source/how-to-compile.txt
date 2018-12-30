@@ -1,0 +1,9 @@
+
+Due to the performance issues it is recommended to use MinGW even under Windows.
+
+Under Windows the code can be compiled using the following commands (make sure you are using 64-bit MinGW):
+
+g++ -D BUILD_DLL -Ofast -c -o slp.o slp.cpp -fopenmp
+g++ -static -static-libgcc -static-libstdc++ -shared -o slp.dll -Wl, slp.o -fopenmp
+
+Alternatively, MS Visual Studio can be used in the usual way.
