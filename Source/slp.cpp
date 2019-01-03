@@ -40,7 +40,8 @@ void recoverSLP(const unsigned int *row, const unsigned int *col, const double *
 
 	// keeps starting indices of rows in the sparse matrix
 	// (required for parallel processing)
-	std::unique_ptr<int[]> indices(new int[numNodes]);
+	std::unique_ptr<int[]> indices(new int[numNodes + 1]);
+	std::unique_ptr<int[]> sumPlusStart(new int[numNodes]); // indices where sumPlus starts
 
 	// initialize
 	memset(xhat, 0, numNodes * sizeof(double));
@@ -56,13 +57,18 @@ void recoverSLP(const unsigned int *row, const unsigned int *col, const double *
 		{
 			++i = row[l];
 			indices[i] = l;
+			sumPlusStart[i] = l;
 		}
+		if (col[l] < row[l]) sumPlusStart[i] = l + 1;
+
 		lambda[l] = (double)1 / (2 * val[l]);
 		gamma[row[l]] += val[l];
 	}
 
 	for (unsigned int i = 0; i < numNodes; i++)
 		gamma[i] = 1 / gamma[i];
+
+	indices[numNodes] = sparseSize;
 
 	// iterations of the SLP
 	for (unsigned int k = 0; k < numIter; k++)
@@ -73,15 +79,15 @@ void recoverSLP(const unsigned int *row, const unsigned int *col, const double *
 		for (unsigned int i = 0; i < numNodes; i++)
 		{
 			unsigned int lstart = indices[i];
-			unsigned int lend = (i != numNodes - 1) ? indices[i + 1] : sparseSize;
+			unsigned int lmiddle = sumPlusStart[i];
+			unsigned int lend = indices[i + 1];
 
+			//
 			double sumPlus = 0, sumMinus = 0;
-			for (unsigned int l = lstart; l < lend; l++)
-			{
-				unsigned int j = col[l];
-				if (j > i) sumPlus += (val[l] * y[l]);
-				else if (j < i) sumMinus += (val[l] * y[l]);
-			}
+			for (unsigned int l = lstart; l < lmiddle; l++) sumMinus += (val[l] * y[l]);
+			//
+			for (unsigned int l = lmiddle; l < lend; l++) sumPlus += (val[l] * y[l]);
+
 			xhat[i] -= gamma[i] * (sumPlus - sumMinus);
 			xbuff[i] = 2 * xhat[i] - xbuff[i];
 		}
